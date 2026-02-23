@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ComptaPro Ultimate Business</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root { --primary: #1e293b; --success: #10b981; --danger: #ef4444; --bg: #f8fafc; }
+        body { background: var(--bg); font-family: 'Inter', sans-serif; padding-bottom: 90px; color: #334155; }
+        .main-container { max-width: 900px; margin: 0 auto; padding: 10px; }
+        .page { display: none; animation: fadeIn 0.3s ease; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .card-pro { background: white; border-radius: 16px; padding: 20px; margin-bottom: 15px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 900px; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid #e2e8f0; z-index: 2000; border-radius: 15px 15px 0 0; }
+        .nav-item { text-align: center; color: #94a3b8; text-decoration: none; font-size: 0.7rem; flex: 1; }
+        .nav-item.active { color: var(--primary); font-weight: 700; }
+        .nav-item i { font-size: 1.3rem; display: block; }
+
+        .fab { position: fixed; bottom: 85px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; border: none; font-size: 24px; box-shadow: 0 8px 15px rgba(0,0,0,0.2); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #f1f5f9; }
+        .search-bar { background: white; border-radius: 50px; padding: 8px 18px; border: 1px solid #e2e8f0; margin-bottom: 15px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    <nav class="bottom-nav">
+        <a href="#" class="nav-item active" onclick="showPage('dash', this)"><i class="bi bi-speedometer2"></i>Accueil</a>
+        <a href="#" class="nav-item" onclick="showPage('journal', this)"><i class="bi bi-receipt"></i>Flux</a>
+        <a href="#" class="nav-item" onclick="showPage('stock', this)"><i class="bi bi-archive"></i>Stocks</a>
+        <a href="#" class="nav-item" onclick="showPage('tiers', this)"><i class="bi bi-people"></i>Tiers</a>
+        <a href="#" class="nav-item" onclick="showPage('settings', this)"><i class="bi bi-sliders"></i>Admin</a>
+    </nav>
+
+    <div id="dash" class="page active">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="fw-bold m-0 text-primary" id="displayBizName">ComptaPro</h4>
+            <span class="badge bg-white text-dark shadow-sm p-2" id="currentDate"></span>
+        </div>
+
+        <div class="card-pro bg-primary text-white border-0 mb-4">
+            <small class="opacity-75">Solde Net Disponible</small>
+            <div class="display-6 fw-bold" id="netCash">0 CFA</div>
+            <div class="mt-3 row g-0 border-top border-white border-opacity-25 pt-2 text-center">
+                <div class="col-6 border-end"><small>Ventes (TTC)</small><br><b id="dashTTC">0</b></div>
+                <div class="col-6"><small>TVA (Estimée)</small><br><b id="dashTVA">0</b></div>
+            </div>
+        </div>
+
+        <div id="alertSection"></div>
+
+        <div class="card-pro mb-4">
+            <h6 class="fw-bold mb-3 small text-uppercase text-muted">Performance des Ventes</h6>
+            <div style="height: 180px;"><canvas id="mainChart"></canvas></div>
+        </div>
+
+        <div class="row g-2 mb-4">
+            <div class="col-6"><div class="card-pro text-center p-3 mb-0"><small class="text-muted d-block">Dettes</small><b id="dashDebt" class="text-danger">0</b></div></div>
+            <div class="col-6"><div class="card-pro text-center p-3 mb-0"><small class="text-muted d-block">Créances</small><b id="dashCredit" class="text-success">0</b></div></div>
+        </div>
+    </div>
+
+    <div id="journal" class="page">
+        <h5 class="fw-bold mb-3">Historique des flux</h5>
+        <div class="search-bar d-flex align-items-center">
+            <i class="bi bi-search me-2 text-muted"></i>
+            <input type="text" id="searchTx" class="form-control border-0 p-0" placeholder="Rechercher une transaction..." onkeyup="renderAll()">
+        </div>
+        <div id="txList" class="card-pro p-0 overflow-hidden"></div>
+    </div>
+
+    <div id="stock" class="page">
+        <h5 class="fw-bold mb-3">Inventaire Stock</h5>
+        <div class="search-bar d-flex align-items-center">
+            <i class="bi bi-search me-2 text-muted"></i>
+            <input type="text" id="searchStock" class="form-control border-0 p-0" placeholder="Rechercher un produit..." onkeyup="renderAll()">
+        </div>
+        <div id="stockList" class="card-pro p-0 overflow-hidden"></div>
+    </div>
+
+    <div id="tiers" class="page">
+        <h5 class="fw-bold mb-3">Clients & Fournisseurs</h5>
+        <div class="search-bar d-flex align-items-center">
+            <i class="bi bi-search me-2 text-muted"></i>
+            <input type="text" id="searchTiers" class="form-control border-0 p-0" placeholder="Rechercher un nom..." onkeyup="renderAll()">
+        </div>
+        <div id="tiersList" class="card-pro p-0 overflow-hidden"></div>
+    </div>
+
+    <div id="settings" class="page">
+        <h5 class="fw-bold mb-3">Configuration Business</h5>
+        <div class="card-pro mb-3">
+            <label class="small fw-bold text-uppercase">Nom de l'Entreprise</label>
+            <input type="text" id="bizName" class="form-control rounded-pill mb-3" onchange="updateSettings()">
+            
+            <label class="small fw-bold text-uppercase">Logo URL (PNG/JPG)</label>
+            <input type="text" id="bizLogo" class="form-control rounded-pill mb-3" onchange="updateSettings()">
+
+            <div class="row">
+                <div class="col-6"><label class="small fw-bold">TVA (%)</label><input type="number" id="tvaRate" class="form-control rounded-pill" onchange="updateSettings()"></div>
+                <div class="col-6"><label class="small fw-bold">Devise</label><input type="text" id="currency" class="form-control rounded-pill" onchange="updateSettings()"></div>
+            </div>
+        </div>
+        
+        <div class="card-pro">
+            <h6 class="fw-bold mb-3 small text-uppercase text-muted">Actions</h6>
+            <button class="btn btn-dark w-100 rounded-pill mb-2" onclick="generateFullReport()"><i class="bi bi-file-earmark-pdf me-2"></i>Exporter Rapport PDF</button>
+            <button class="btn btn-outline-danger w-100 rounded-pill" onclick="hardReset()"><i class="bi bi-trash me-2"></i>Réinitialiser l'application</button>
+        </div>
+    </div>
+</div>
+
+<button class="fab" onclick="openUniversalModal()"><i class="bi bi-plus-lg"></i></button>
+
+<div class="modal fade" id="mainModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-body">
+                <h6 class="fw-bold mb-3">Nouvel Enregistrement</h6>
+                <select id="typeSelect" class="form-select rounded-pill mb-3 bg-light border-0" onchange="switchForm()">
+                    <option value="tx">💰 Flux (Vente/Achat)</option>
+                    <option value="stk">📦 Nouveau Produit</option>
+                    <option value="tie">👤 Client / Fournisseur</option>
+                </select>
+                <div id="dynamicForm"></div>
+                <button class="btn btn-primary w-100 mt-4 py-3 rounded-pill fw-bold" onclick="saveAll()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // --- DATABASE & INITIALISATION ---
+    let db = JSON.parse(localStorage.getItem('ultimate_compta_db')) || { 
+        tx: [], stock: [], tiers: [], 
+        settings: { tva: 18, curr: 'CFA', bizName: 'Ma Boutique', bizLogo: '' }
+    };
+    let myChart = null;
+
+    function showPage(id, el) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        el.classList.add('active');
+        renderAll();
+    }
+
+    // --- LOGIQUE FORMULAIRE DYNAMIQUE ---
+    function switchForm() {
+        const val = document.getElementById('typeSelect').value;
+        const container = document.getElementById('dynamicForm');
+        if(val==='tx') {
+            let options = db.stock.map(p => `<option value="${p.label}">${p.label} (Stock: ${p.qty})</option>`).join('');
+            container.innerHTML = `
+                <input type="date" id="f1" class="form-control mb-2 rounded-pill" value="${new Date().toISOString().split('T')[0]}">
+                <select id="f_prod" class="form-select mb-2 rounded-pill"><option value="">-- Choisir un produit (Optionnel) --</option>${options}</select>
+                <input type="text" id="f2" class="form-control mb-2 rounded-pill" placeholder="Désignation manuelle">
+                <input type="number" id="f3" class="form-control mb-2 rounded-pill" placeholder="Montant TTC">
+                <select id="f4" class="form-select rounded-pill"><option value="Vente">Vente (Entrée)</option><option value="Achat">Achat (Sortie)</option></select>`;
+        } else if(val==='stk') {
+            container.innerHTML = `
+                <input type="text" id="f1" class="form-control mb-2 rounded-pill" placeholder="Nom du produit">
+                <input type="number" id="f2" class="form-control mb-2 rounded-pill" placeholder="Quantité initiale">
+                <input type="number" id="f3" class="form-control mb-2 rounded-pill" placeholder="Prix d'achat unitaire">
+                <input type="number" id="f4" class="form-control rounded-pill" placeholder="Seuil d'alerte (ex: 5)">`;
+        } else {
+            container.innerHTML = `
+                <input type="text" id="f1" class="form-control mb-2 rounded-pill" placeholder="Nom du tiers">
+                <input type="number" id="f2" class="form-control mb-2 rounded-pill" placeholder="Montant">
+                <select id="f3" class="form-select rounded-pill"><option value="Client">Client (Créance)</option><option value="Fournisseur">Fournisseur (Dette)</option></select>`;
+        }
+    }
+
+    // --- ACTIONS ---
+    function saveAll() {
+        const type = document.getElementById('typeSelect').value;
+        if(type==='tx') {
+            const prodName = document.getElementById('f_prod').value;
+            const label = prodName || document.getElementById('f2').value;
+            const ttc = parseFloat(document.getElementById('f3').value);
+            const isVente = document.getElementById('f4').value === 'Vente';
+            if(prodName && isVente) {
+                const p = db.stock.find(x => x.label === prodName);
+                if(p) p.qty -= 1; 
+            }
+            db.tx.push({ date: document.getElementById('f1').value, label: label, ttc: ttc, tva: (ttc - (ttc / (1 + db.settings.tva/100))).toFixed(0), type: document.getElementById('f4').value });
+        } else if(type==='stk') {
+            db.stock.push({ label: document.getElementById('f1').value, qty: parseInt(document.getElementById('f2').value), price: parseFloat(document.getElementById('f3').value), threshold: parseInt(document.getElementById('f4').value) });
+        } else {
+            db.tiers.push({ label: document.getElementById('f1').value, amount: parseFloat(document.getElementById('f2').value), type: document.getElementById('f3').value });
+        }
+        sync();
+        bootstrap.Modal.getInstance(document.getElementById('mainModal')).hide();
+    }
+
+    function deleteItem(cat, idx) {
+        if(confirm("Confirmer la suppression ?")) { db[cat].splice(idx, 1); sync(); }
+    }
+
+    function editQty(idx) {
+        const n = prompt("Ajuster la quantité en stock :", db.stock[idx].qty);
+        if(n !== null) { db.stock[idx].qty = parseInt(n); sync(); }
+    }
+
+    function sync() {
+        localStorage.setItem('ultimate_compta_db', JSON.stringify(db));
+        renderAll();
+    }
+
+    // --- RENDU GÉNÉRAL ---
+    function renderAll() {
+        document.getElementById('currentDate').innerText = new Date().toLocaleDateString();
+        document.getElementById('displayBizName').innerText = db.settings.bizName;
+        
+        // Synchro inputs admin
+        document.getElementById('bizName').value = db.settings.bizName;
+        document.getElementById('bizLogo').value = db.settings.bizLogo;
+        document.getElementById('tvaRate').value = db.settings.tva;
+        document.getElementById('currency').value = db.settings.curr;
+
+        const qTx = document.getElementById('searchTx')?.value.toLowerCase() || "";
+        const qSt = document.getElementById('searchStock')?.value.toLowerCase() || "";
+        const qTi = document.getElementById('searchTiers')?.value.toLowerCase() || "";
+
+        let inTotal = 0, outTotal = 0, tvaSum = 0, alertH = '';
+
+        // Journal
+        let txH = '';
+        db.tx.filter(t => t.label.toLowerCase().includes(qTx)).sort((a,b)=>new Date(b.date)-new Date(a.date)).forEach((t, i) => {
+            const isV = t.type==='Vente';
+            isV ? inTotal += t.ttc : outTotal += t.ttc;
+            if(isV) tvaSum += parseFloat(t.tva);
+            txH += `<div class="list-item"><div><b class="d-block">${t.label}</b><small>${t.date}</small></div><div class="text-end"><b class="${isV?'text-success':'text-danger'} d-block">${isV?'+':'-'}${t.ttc}</b><i class="bi bi-trash text-muted" style="cursor:pointer" onclick="deleteItem('tx',${i})"></i></div></div>`;
+        });
+        document.getElementById('txList').innerHTML = txH || '<p class="p-3 text-center text-muted">Aucun flux</p>';
+
+        // Stock
+        let stH = '';
+        db.stock.filter(s => s.label.toLowerCase().includes(qSt)).forEach((p, i) => {
+            const isLow = p.qty <= p.threshold;
+            if(isLow) alertH += `<div class="alert alert-danger p-2 mb-2 small shadow-sm"><i class="bi bi-exclamation-triangle me-2"></i>Stock bas : ${p.label}</div>`;
+            stH += `<div class="list-item"><div><b>${p.label}</b><br><small>Prix: ${p.price}</small></div><div class="text-end"><span class="badge ${isLow?'bg-danger':'bg-success'} rounded-pill mb-1">Stock: ${p.qty}</span><br><i class="bi bi-pencil-square text-primary me-2" onclick="editQty(${i})"></i><i class="bi bi-trash text-muted" onclick="deleteItem('stock',${i})"></i></div></div>`;
+        });
+        document.getElementById('stockList').innerHTML = stH || '<p class="p-3 text-center text-muted">Stock vide</p>';
+        document.getElementById('alertSection').innerHTML = alertH;
+
+        // Tiers
+        let tiH = '', dTotal = 0, cTotal = 0;
+        db.tiers.filter(t => t.label.toLowerCase().includes(qTi)).forEach((t, i) => {
+            t.type==='Client' ? cTotal += t.amount : dTotal += t.amount;
+            tiH += `<div class="list-item"><b>${t.label}</b><span>${t.amount} ${db.settings.curr} <i class="bi bi-trash ms-2 text-muted" onclick="deleteItem('tiers',${i})"></i></span></div>`;
+        });
+        document.getElementById('tiersList').innerHTML = tiH || '<p class="p-3 text-center text-muted">Aucun tiers</p>';
+
+        // Dash Numbers
+        document.getElementById('netCash').innerText = (inTotal - outTotal).toLocaleString() + ' ' + db.settings.curr;
+        document.getElementById('dashTTC').innerText = inTotal.toLocaleString();
+        document.getElementById('dashTVA').innerText = tvaSum.toLocaleString();
+        document.getElementById('dashDebt').innerText = dTotal.toLocaleString();
+        document.getElementById('dashCredit').innerText = cTotal.toLocaleString();
+
+        if(document.getElementById('dash').classList.contains('active')) updateChart();
+    }
+
+    // --- GRAPHique ---
+    function updateChart() {
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        const days = [...Array(7)].map((_, i) => {
+            const d = new Date(); d.setDate(d.getDate() - (6-i));
+            return d.toISOString().split('T')[0];
+        });
+        const dataVentes = days.map(day => db.tx.filter(t => t.date === day && t.type === 'Vente').reduce((a, b) => a + b.ttc, 0));
+        
+        if (myChart) myChart.destroy();
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: days.map(d => d.split('-')[2] + '/' + d.split('-')[1]),
+                datasets: [{ data: dataVentes, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.4 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false } } } }
+        });
+    }
+
+    // --- EXPORT PDF PROFESSIONNEL ---
+    async function generateFullReport() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const bizName = db.settings.bizName.toUpperCase();
+        
+        // En-tête
+        doc.setFontSize(22);
+        doc.setTextColor(30, 41, 59);
+        doc.text(bizName, 14, 20);
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`BILAN GÉNÉRAL AU ${new Date().toLocaleDateString()}`, 14, 28);
+        doc.line(14, 32, 196, 32);
+
+        // Tableau Flux
+        doc.setTextColor(0);
+        doc.setFontSize(14);
+        doc.text("HISTORIQUE DES TRANSACTIONS", 14, 45);
+        doc.autoTable({
+            startY: 50,
+            head: [['Date', 'Désignation', 'Type', 'Montant']],
+            body: db.tx.map(t => [t.date, t.label, t.type, `${t.ttc} ${db.settings.curr}`]),
+            headStyles: { fillColor: [30, 41, 59] }
+        });
+
+        // Tableau Stocks
+        doc.text("ÉTAT DES STOCKS", 14, doc.lastAutoTable.finalY + 15);
+        doc.autoTable({
+            startY: doc.lastAutoTable.finalY + 20,
+            head: [['Produit', 'Quantité', 'Prix Unit.', 'Statut']],
+            body: db.stock.map(p => [p.label, p.qty, p.price, p.qty <= p.threshold ? 'ALERTE' : 'OK']),
+            headStyles: { fillColor: [16, 185, 129] }
+        });
+
+        doc.save(`Rapport_${bizName}.pdf`);
+    }
+
+    function updateSettings() {
+        db.settings.bizName = document.getElementById('bizName').value;
+        db.settings.bizLogo = document.getElementById('bizLogo').value;
+        db.settings.tva = parseFloat(document.getElementById('tvaRate').value);
+        db.settings.curr = document.getElementById('currency').value;
+        sync();
+    }
+
+    function openUniversalModal() { new bootstrap.Modal(document.getElementById('mainModal')).show(); switchForm(); }
+    function hardReset() { if(confirm("Attention : Supprimer toutes les données ?")) { localStorage.clear(); location.reload(); }}
+
+    renderAll();
+</script>
+</body>
+  </html>
+  
